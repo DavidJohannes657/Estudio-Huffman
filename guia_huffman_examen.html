@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Guía de estudio — Huffman</title>
+<style>
+body{margin:0;background:#eef2f7;color:#182235;font:16px/1.6 Arial,sans-serif}main{max-width:950px;margin:28px auto;padding:0 16px}.paper{background:white;padding:clamp(20px,5vw,48px);border:1px solid #d9e0e9;border-radius:14px}h1{font-size:2.5rem;line-height:1.1}h2{margin-top:2em;border-bottom:2px solid #dce3ed;padding-bottom:7px}h3{margin-top:1.4em}table{border-collapse:collapse;width:100%;margin:12px 0 18px}th,td{border:1px solid #d6deea;padding:8px;text-align:left}th{background:#f1f5f9}.note,.warn,.sol{padding:13px 16px;border-radius:9px;margin:14px 0}.note{background:#eff6ff;border-left:4px solid #2563eb}.warn{background:#fff7e6;border-left:4px solid #d97706}.sol{background:#effaf3;border-left:4px solid #15945b}code,pre,.bits{font-family:Consolas,monospace}code{background:#edf1f6;padding:2px 5px;border-radius:4px}.bits{display:block;background:#111827;color:#fff;padding:12px;border-radius:8px;overflow-wrap:anywhere;letter-spacing:.06em}.exercise{border:1px solid #d6deea;border-radius:10px;padding:15px;margin:15px 0;break-inside:avoid}.muted{color:#586579}.tag{font-size:.8rem;color:#1745a5;font-weight:bold;text-transform:uppercase}@media print{body{background:white}.paper{border:0;padding:0}main{margin:0}.exercise{break-inside:avoid}}
+</style></head><body><main><article class="paper">
+<div class="tag">Material de repaso para examen</div><h1>Algoritmo de Huffman</h1>
+<p class="muted">Guía detallada de compresión y descompresión, siguiendo el orden de trabajo del tablero: frecuencias, ASCII, árbol, códigos, cálculo de tamaño, bytes, estructura del archivo y recuperación del texto.</p>
+<div class="note"><b>Objetivo:</b> comprender qué se hace en cada etapa y por qué. Los ejercicios están antes de las soluciones para que puedas resolverlos sin mirar.</div>
+
+<h2>1. ¿Qué hace Huffman?</h2>
+<p>Huffman es un algoritmo de compresión <b>sin pérdida</b>: permite representar un texto con menos bits y después recuperar exactamente el texto original. Asigna códigos binarios de longitud variable. En general, los caracteres frecuentes reciben códigos más cortos y los poco frecuentes, códigos más largos.</p>
+<p><b>No confundas:</b> ASCII representa el carácter original; Huffman representa ese mismo carácter dentro del mensaje comprimido. Son dos códigos distintos.</p>
+
+<h2>2. ASCII: decimal y binario</h2>
+<p>En los ejercicios de clase se está comparando el texto original como <b>8 bits (1 byte) por carácter</b>. El ASCII estándar tiene valores de 0 a 127 (7 bits); normalmente se almacena en un byte completando con cero a la izquierda cuando hace falta. Para letras inglesas, números y espacio, la siguiente tabla sirve:</p>
+<table><tr><th>Carácter</th><th>Decimal</th><th>Binario de 8 bits</th><th>Carácter</th><th>Decimal</th><th>Binario de 8 bits</th></tr>
+<tr><td>Espacio</td><td>32</td><td>00100000</td><td>A</td><td>65</td><td>01000001</td></tr>
+<tr><td>0</td><td>48</td><td>00110000</td><td>B</td><td>66</td><td>01000010</td></tr>
+<tr><td>1</td><td>49</td><td>00110001</td><td>C</td><td>67</td><td>01000011</td></tr>
+<tr><td>9</td><td>57</td><td>00111001</td><td>D</td><td>68</td><td>01000100</td></tr>
+<tr><td>a</td><td>97</td><td>01100001</td><td>Z</td><td>90</td><td>01011010</td></tr>
+<tr><td>b</td><td>98</td><td>01100010</td><td>z</td><td>122</td><td>01111010</td></tr></table>
+<p><b>Trucos para el decimal:</b> mayúsculas A–Z van de 65 a 90; minúsculas a–z van de 97 a 122; dígitos 0–9 van de 48 a 57; espacio es 32. Las letras consecutivas aumentan de uno en uno: A=65, B=66, C=67…</p>
+<h3>Convertir decimal a binario usando potencias de 2</h3>
+<p>Memoriza las posiciones de un byte:</p>
+<table><tr><th>128</th><th>64</th><th>32</th><th>16</th><th>8</th><th>4</th><th>2</th><th>1</th></tr></table>
+<p>Ejemplo: A = 65. Descompón 65 = 64 + 1. Pon 1 debajo de 64 y de 1; pon 0 en las demás posiciones.</p>
+<table><tr><th>128</th><th>64</th><th>32</th><th>16</th><th>8</th><th>4</th><th>2</th><th>1</th></tr><tr><td>0</td><td>1</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>1</td></tr></table>
+<div class="sol"><b>A = 65 decimal = 01000001 binario.</b> Si el resultado tiene menos de 8 dígitos, completa con ceros a la izquierda.</div>
+<h3>Método alternativo: divisiones entre 2</h3>
+<p>Divide el decimal entre 2, anota los residuos y léelos de abajo hacia arriba. Para 65: 65÷2 da residuo 1; 32÷2 residuo 0; 16÷2 residuo 0; 8÷2 residuo 0; 4÷2 residuo 0; 2÷2 residuo 0; 1÷2 residuo 1. De abajo hacia arriba: <code>1000001</code>. Completa a 8 bits: <code>01000001</code>.</p>
+<div class="warn"><b>Ojo con tildes y ñ:</b> no pertenecen al ASCII estándar. En UTF-8 pueden ocupar más de un byte. Si el enunciado incluye esos caracteres, usa la codificación que indique el profesor; no asumas que todo carácter siempre equivale a un byte.</div>
+
+<h2>3. Compresión: los pasos en orden</h2>
+<ol>
+<li><b>Escribir el texto original.</b> Respeta mayúsculas, minúsculas, espacios y signos. Cada símbolo distinto es un carácter diferente.</li>
+<li><b>Contar frecuencias (TF).</b> Cuenta cuántas veces aparece cada carácter.</li>
+<li><b>Completar la tabla.</b> Para cada carácter escribe TF, ASCII decimal, CH y binario ASCII de 8 bits (según la convención de clase). Esta columna todavía no es Huffman.</li>
+<li><b>Ordenar.</b> Organiza los nodos de menor a mayor frecuencia.</li>
+<li><b>Construir el árbol.</b> Toma los dos nodos de menor frecuencia, únelos y crea un padre con la suma de ambas frecuencias. Vuelve a ordenar y repite hasta que quede un solo nodo: la raíz.</li>
+<li><b>Asignar ramas.</b> En el ejemplo de esta guía usamos izquierda=0 y derecha=1. El código de cada carácter es el camino desde la raíz hasta su hoja.</li>
+<li><b>Codificar.</b> Reemplaza cada carácter del texto por su código Huffman y concatena los códigos. No sumes los códigos como números: pégalos uno detrás de otro.</li>
+<li><b>Contar los bits Huffman.</b> Suma la longitud del código de cada carácter, multiplicada por su frecuencia.</li>
+<li><b>Empaquetar en bytes.</b> Agrupa los bits de ocho en ocho. Solo si el último grupo queda incompleto, agrega ceros al final y registra cuántos agregaste.</li>
+<li><b>Guardar información para descomprimir.</b> El archivo necesita datos suficientes para reconstruir el árbol y conocer cuántos bits son válidos.</li>
+</ol>
+
+<h2>4. Ejemplo completo: BANANA</h2>
+<p>Texto: <code>BANANA</code>. Tiene seis caracteres. Frecuencias: B=1, A=3, N=2.</p>
+<table><tr><th>TF</th><th>ASCII decimal</th><th>CH</th><th>Binario original (8 bits)</th></tr>
+<tr><td>1</td><td>66</td><td>B</td><td>01000010</td></tr><tr><td>3</td><td>65</td><td>A</td><td>01000001</td></tr><tr><td>2</td><td>78</td><td>N</td><td>01001110</td></tr></table>
+<p>Orden ascendente: B(1), N(2), A(3).</p>
+<ul><li>Primera unión: B(1)+N(2)=nodo(3).</li><li>Quedan nodo(3) y A(3). Se unen: 3+3=raíz(6).</li></ul>
+<pre>                 (6)
+                /   \
+             0 /     \ 1
+              (3)     A
+             /   \
+          0 /     \ 1
+           B       N
+
+A = 1
+B = 00
+N = 01</pre>
+<p>Este dibujo coloca B-N a la izquierda y A a la derecha. En empates pueden existir distintos árboles válidos; respeta el criterio de desempate y la orientación que use tu profesor.</p>
+<h3>Codificar el texto</h3>
+<table><tr><th>Texto</th><td>B</td><td>A</td><td>N</td><td>A</td><td>N</td><td>A</td></tr><tr><th>Código</th><td>00</td><td>1</td><td>01</td><td>1</td><td>01</td><td>1</td></tr></table>
+<p>Concatenación: <code>00 + 1 + 01 + 1 + 01 + 1</code>.</p><span class="bits">001011011</span>
+<p>Son <b>9 bits</b>, porque hay nueve dígitos binarios. Comprobación: B aporta 1×2=2; A aporta 3×1=3; N aporta 2×2=4. Total=2+3+4=9.</p>
+
+<h2>5. Comparar tamaño y calcular ahorro</h2>
+<h3>Tamaño original</h3><p>Si se usan 8 bits por carácter: 6×8=<b>48 bits</b>.</p>
+<h3>Tamaño Huffman lógico</h3><table><tr><th>Carácter</th><th>Frecuencia</th><th>Longitud código</th><th>Bits aportados</th></tr><tr><td>B</td><td>1</td><td>2</td><td>1×2=2</td></tr><tr><td>A</td><td>3</td><td>1</td><td>3×1=3</td></tr><tr><td>N</td><td>2</td><td>2</td><td>2×2=4</td></tr><tr><th colspan="3">Total</th><th>9 bits</th></tr></table>
+<p><b>Factor de compresión</b> = original ÷ comprimido lógico = 48÷9 = 5,33.</p>
+<p><b>Porcentaje de ahorro</b> = ((original−comprimido)÷original)×100 = ((48−9)÷48)×100 = <b>81,25%</b>.</p>
+<div class="warn"><b>Distinción fundamental:</b> 9 bits es el contenido Huffman útil, antes del relleno. Para guardarlo en bytes hacen falta 16 bits: 9 útiles + 7 de relleno. Si calculas el tamaño físico del archivo también debes sumar la cabecera y la información del árbol. El ahorro real del archivo será menor.</div>
+
+<h2>6. De bits a bytes: relleno</h2>
+<p>Un byte tiene ocho bits. Separa la cadena de nueve bits:</p><span class="bits">00101101 | 1</span>
+<p>Al último grupo le faltan siete posiciones. Agrega siete ceros al final:</p><span class="bits">00101101 | 10000000</span>
+<table><tr><th>Byte</th><th>Binario</th><th>Decimal</th></tr><tr><td>1</td><td>00101101</td><td>45</td></tr><tr><td>2</td><td>10000000</td><td>128</td></tr></table>
+<p>Se guardan dos bytes (16 bits físicos) y hay que registrar que siete bits son relleno. Los ceros se agregan solamente al final de toda la cadena, nunca entre códigos.</p>
+
+<h2>7. Estructura del archivo</h2>
+<p>En las fotos del tablero parecen aparecer campos como NF, TREE, BS y datos. La nomenclatura exacta debe confirmarse en tus apuntes; su función general sería:</p>
+<table><tr><th>Campo</th><th>Significado posible</th><th>Función</th></tr><tr><td>NF</td><td>Número de caracteres diferentes</td><td>Indicar cuántos símbolos/hojas hay que describir.</td></tr><tr><td>TREE</td><td>Representación del árbol</td><td>Permitir reconstruir los códigos al descomprimir.</td></tr><tr><td>BS</td><td>Bits sobrantes o de relleno</td><td>Indicar cuántos bits finales agregados no pertenecen al mensaje.</td></tr><tr><td>DATOS</td><td>Bytes comprimidos</td><td>Contener la secuencia Huffman.</td></tr></table>
+<div class="warn">No existe una única cabecera universal de Huffman. La forma de guardar el árbol depende de la implementación del curso. En el examen reproduce exactamente el formato del profesor.</div>
+
+<h2>8. Descompresión: pasos en orden</h2>
+<ol><li><b>Leer la cabecera:</b> obtener el árbol o los datos para reconstruirlo y la longitud válida de los bits.</li><li><b>Reconstruir el árbol:</b> debe ser el mismo árbol que se utilizó al comprimir.</li><li><b>Recuperar los bits:</b> convertir los bytes a grupos de 8 bits y eliminar únicamente el relleno indicado.</li><li><b>Empezar en la raíz:</b> leer los bits de izquierda a derecha.</li><li><b>Seguir ramas:</b> 0 a la izquierda y 1 a la derecha, de acuerdo con la convención utilizada.</li><li><b>Al llegar a una hoja:</b> escribir el carácter y volver a la raíz.</li><li><b>Repetir:</b> terminar cuando se consuman todos los bits válidos o se alcance la cantidad original de caracteres.</li></ol>
+<h3>Ejemplo de recuperación</h3><p>Árbol: A=1, B=00, N=01. Bits válidos:</p><span class="bits">001011011</span>
+<table><tr><th>Bits consumidos</th><th>Carácter</th><th>Texto acumulado</th></tr><tr><td>00</td><td>B</td><td>B</td></tr><tr><td>1</td><td>A</td><td>BA</td></tr><tr><td>01</td><td>N</td><td>BAN</td></tr><tr><td>1</td><td>A</td><td>BANA</td></tr><tr><td>01</td><td>N</td><td>BANAN</td></tr><tr><td>1</td><td>A</td><td>BANANA</td></tr></table>
+<div class="sol"><b>Resultado: BANANA.</b> Cada vez que se llega a una hoja se emite ese carácter y se vuelve a la raíz.</div>
+
+<h2>9. Errores que debes evitar</h2>
+<ul><li>Ignorar espacios, signos o diferencias entre mayúsculas y minúsculas.</li><li>Confundir ASCII con Huffman.</li><li>No volver a ordenar después de cada unión.</li><li>Unir nodos que no son los dos menores disponibles.</li><li>Leer los códigos desde la hoja hacia la raíz.</li><li>Sumar códigos como números en vez de concatenarlos.</li><li>Decir que <code>001011011</code> tiene 11 bits: tiene nueve.</li><li>Agregar relleno entre caracteres: solo se agrega al final.</li><li>Eliminar ceros válidos al descomprimir: descarta únicamente el relleno registrado.</li><li>Olvidar que la cabecera y el árbol también ocupan espacio en el archivo real.</li></ul>
+
+<h2>10. Ejercicios: compresión</h2>
+<p class="muted">Resuélvelos en papel antes de mirar las soluciones de la sección 12.</p>
+<div class="exercise"><h3>Compresión 1 — ABBA</h3><ol><li>Haz la tabla de frecuencias.</li><li>Escribe ASCII decimal y binario de ocho bits para A y B.</li><li>Construye el árbol y asigna códigos.</li><li>Codifica ABBA y cuenta los bits.</li><li>Calcula tamaño original y ahorro lógico.</li></ol></div>
+<div class="exercise"><h3>Compresión 2 — ABACAB</h3><ol><li>Cuenta A, B y C.</li><li>Ordena las frecuencias y construye el árbol.</li><li>Obtén los códigos.</li><li>Codifica ABACAB.</li><li>Calcula bits útiles, bytes necesarios y relleno.</li></ol></div>
+<div class="exercise"><h3>Compresión 3 — comparación de tamaños</h3><p>Un texto tiene 20 caracteres y el resultado Huffman ocupa 55 bits.</p><ol><li>Calcula el tamaño original suponiendo 8 bits por carácter.</li><li>Calcula el factor de compresión.</li><li>Calcula el porcentaje de ahorro lógico.</li><li>¿Cuántos bytes se necesitan para almacenar 55 bits? ¿Cuántos bits de relleno?</li></ol></div>
+<div class="exercise"><h3>Compresión 4 — ASCII</h3><p>Convierte A, C, a, 0 y espacio a decimal ASCII y binario de ocho bits.</p></div>
+
+<h2>11. Ejercicios: descompresión</h2>
+<div class="exercise"><h3>Descompresión 1</h3><p>Usa A=<code>0</code>, B=<code>10</code>, C=<code>11</code>. Descomprime <code>010110</code>. Separa los bits por carácter y escribe el texto.</p></div>
+<div class="exercise"><h3>Descompresión 2</h3><p>Usa A=<code>1</code>, B=<code>00</code>, N=<code>01</code>. Descomprime <code>001011011</code>.</p></div>
+<div class="exercise"><h3>Descompresión 3 — relleno</h3><p>Hay 10 bits válidos: <code>1011001011</code>. Se guardan en bytes.</p><ol><li>Sepáralos en grupos de ocho.</li><li>Completa el último byte.</li><li>¿Cuántos ceros de relleno agregas?</li><li>¿Qué debe hacer el descompresor con esos ceros?</li></ol></div>
+<div class="exercise"><h3>Descompresión 4 — explicación</h3><p>Explica en orden cómo pasar de un archivo Huffman guardado en bytes al texto original. Incluye la función del árbol y del dato de relleno.</p></div>
+
+<h2>12. Soluciones</h2>
+<h3>Compresión 1 — ABBA</h3><div class="sol"><p>Frecuencias A=2 y B=2. ASCII: A=65=<code>01000001</code>; B=66=<code>01000010</code>. Un árbol posible da A=0 y B=1 (el orden puede invertirse por el empate). ABBA → <code>0110</code>, cuatro bits. Original=4×8=32 bits. Ahorro=((32−4)/32)×100=<b>87,5%</b>.</p></div>
+<h3>Compresión 2 — ABACAB</h3><div class="sol"><p>Frecuencias A=3, B=2, C=1. Une C(1)+B(2)=3; después nodo(3)+A(3)=6. Un árbol posible: A=1, C=00, B=01. ABACAB → <code>1 01 1 00 1 01</code> → <code>101100101</code>, nueve bits útiles. Original=6×8=48 bits. Se requieren 2 bytes=16 bits y 7 bits de relleno. Ahorro lógico=((48−9)/48)×100=<b>81,25%</b>. El desempate puede cambiar los códigos, no necesariamente el costo total.</p></div>
+<h3>Compresión 3 — tamaños</h3><div class="sol"><p>Original=20×8=160 bits. Factor=160/55≈<b>2,91</b>. Ahorro=((160−55)/160)×100=<b>65,625%</b>. Se necesitan 7 bytes=56 bits; se agrega <b>1 bit</b> de relleno.</p></div>
+<h3>Compresión 4 — ASCII</h3><div class="sol"><table><tr><th>Carácter</th><th>Decimal</th><th>Binario</th></tr><tr><td>A</td><td>65</td><td>01000001</td></tr><tr><td>C</td><td>67</td><td>01000011</td></tr><tr><td>a</td><td>97</td><td>01100001</td></tr><tr><td>0</td><td>48</td><td>00110000</td></tr><tr><td>Espacio</td><td>32</td><td>00100000</td></tr></table></div>
+<h3>Descompresión 1</h3><div class="sol"><p><code>0 | 10 | 11</code> → A, B, C. Resultado: <b>ABC</b>.</p></div>
+<h3>Descompresión 2</h3><div class="sol"><p><code>00 | 1 | 01 | 1 | 01 | 1</code> → B, A, N, A, N, A. Resultado: <b>BANANA</b>.</p></div>
+<h3>Descompresión 3</h3><div class="sol"><p><code>10110010 | 11</code>. Byte completo: <code>10110010 | 11000000</code>. Se agregan <b>6 ceros</b>. El descompresor debe descartar exactamente esos seis bits finales y conservar los diez bits válidos.</p></div>
+<h3>Descompresión 4</h3><div class="sol"><p>Leer cabecera; reconstruir árbol; convertir bytes a bits; retirar solo el relleno indicado o limitarse a la longitud válida; empezar en la raíz; seguir izquierda con 0 y derecha con 1; al llegar a una hoja escribir el carácter y volver a la raíz; repetir hasta terminar los bits válidos o alcanzar el número original de caracteres.</p></div>
+
+<h2>13. Resumen para memorizar</h2>
+<div class="note"><b>Compresión:</b> contar → tabla → ordenar → unir los dos menores → repetir → árbol → códigos → concatenar → contar bits → completar bytes → guardar árbol y metadatos.<br><br><b>Descompresión:</b> leer cabecera → reconstruir árbol → recuperar bits válidos → recorrer desde raíz → al llegar a hoja escribir carácter → volver a raíz.<br><br><b>Tamaño original:</b> número de caracteres × 8, si el enunciado usa un byte por carácter.<br><b>Tamaño Huffman lógico:</b> suma de frecuencia × longitud del código.<br><b>Bytes necesarios:</b> redondear los bits útiles al siguiente múltiplo de ocho.<br><b>Relleno:</b> ceros agregados al final, nunca entre códigos.</div>
+<footer class="muted"><hr>Guía de estudio preparada para practicar el procedimiento de Huffman visto en clase. La representación exacta de la cabecera y el criterio para desempatar frecuencias iguales dependen del profesor; confirma esos detalles con tus apuntes.</footer>
+</article></main></body></html>
